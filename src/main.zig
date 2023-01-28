@@ -1,7 +1,6 @@
 const std = @import("std");
 const mem = std.mem;
 
-const Allocator = mem.Allocator;
 const GeneralPurposeAllocator = std.heap.GeneralPurposeAllocator;
 
 // looks first for the zig version in env `ZIGV=`
@@ -12,24 +11,25 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
-    if (std.os.argv.len > 1 and mem.eql(u8, std.mem.span(std.os.argv[1]), "up")) {
+    var arg_list = [_][:0]const u8 {""} ** 512;
+
+    if (std.os.argv.len > 1 and mem.eql(u8, mem.span(std.os.argv[1]), "up")) {
         const bin = multizig ++ "/zigup";
-        var passing_args = std.ArrayList([:0]const u8).init(alloc);
-        defer passing_args.deinit();
         // Pass our custom directories as argments
-        try passing_args.append(bin);
-        try passing_args.append("--install-dir");
-        try passing_args.append(zigup_install_dir);
-        try passing_args.append("--path-link");
-        try passing_args.append(zig_link_path);
+        arg_list[0] = bin;
+        arg_list[1] = "--install-dir";
+        arg_list[2] = zigup_install_dir;
+        arg_list[3] = "--path-link";
+        arg_list[4] = zig_link_path;
+        var arg_list_len: usize = 5;
 
         {
             var args = std.process.args();
             defer args.deinit();
             _ = args.skip();
             _ = args.skip();
-            while (args.next()) |arg| {
-                try passing_args.append(arg);
+            while (args.next()) |arg| : (arg_list_len+=1) {
+                arg_list[arg_list_len] = arg;
             }
         }
 
@@ -38,20 +38,19 @@ pub fn main() !void {
         defer env_map.deinit();
         try env_map.put("PATH", multizig);
 
-        return std.process.execve(alloc, passing_args.items, &env_map);
+        return std.process.execve(alloc, arg_list[0..arg_list_len], &env_map);
     }
 
     const bin = try getZigVersion();
     var args = std.process.args();
     defer args.deinit();
-    var passing_args = std.ArrayList([:0]const u8).init(alloc);
-    defer passing_args.deinit();
     _ = args.skip();
-    try passing_args.append(bin);
-    while (args.next()) |arg| {
-        try passing_args.append(arg);
+    arg_list[0] = bin;
+    var arg_list_len: usize = 1;
+    while (args.next()) |arg| : (arg_list_len += 1) {
+        arg_list[arg_list_len] = arg;
     }
-    return std.process.execv(alloc, passing_args.items);
+    return std.process.execv(alloc, arg_list[0..arg_list_len]);
 }
 
 const home = "/home/falch";
@@ -83,7 +82,7 @@ fn getZigVersion() ![:0]const u8 {
             },
             else => return e,
         };
-        const path = std.mem.trim(u8, contents, "\n\t \x00");
+        const path = mem.trim(u8, contents, "\n\t \x00");
 
         var stream = std.io.fixedBufferStream(&zig_version_buffer);
         try std.fmt.format(stream.writer(), zigup_install_dir ++ "/{s}/files/zig\x00", .{path});
@@ -96,5 +95,5 @@ fn getZigVersion() ![:0]const u8 {
 fn isRoot(dir: std.fs.Dir) !bool {
     var out_buffer: [2048]u8 = undefined;
     const path = try dir.realpath(".", &out_buffer);
-    return std.mem.eql(u8, path, "/");
+    return mem.eql(u8, path, "/");
 }
