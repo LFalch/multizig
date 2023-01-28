@@ -12,6 +12,35 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
+    if (std.os.argv.len > 1 and mem.eql(u8, std.mem.span(std.os.argv[1]), "up")) {
+        const bin = multizig ++ "/zigup";
+        var passing_args = std.ArrayList([:0]const u8).init(alloc);
+        defer passing_args.deinit();
+        // Pass our custom directories as argments
+        try passing_args.append(bin);
+        try passing_args.append("--install-dir");
+        try passing_args.append(zigup_install_dir);
+        try passing_args.append("--path-link");
+        try passing_args.append(zig_link_path);
+
+        {
+            var args = std.process.args();
+            defer args.deinit();
+            _ = args.skip();
+            _ = args.skip();
+            while (args.next()) |arg| {
+                try passing_args.append(arg);
+            }
+        }
+
+        // Lie to `zigup` so it doesn't complain about its zig not being in the path
+        var env_map = try std.process.getEnvMap(alloc);
+        defer env_map.deinit();
+        try env_map.put("PATH", multizig);
+
+        return std.process.execve(alloc, passing_args.items, &env_map);
+    }
+
     const bin = try getZigVersion();
     var args = std.process.args();
     defer args.deinit();
@@ -25,8 +54,9 @@ pub fn main() !void {
     return std.process.execv(alloc, passing_args.items);
 }
 
-const zigup_install_dir = "/home/falch/.zigup";
-const multizig = "/home/falch/.multizig";
+const home = "/home/falch";
+const zigup_install_dir = home ++ "/.zigup";
+const multizig = home ++ "/.multizig";
 const zig_link_path = multizig ++ "/zig";
 
 var zig_version_buffer: [2048]u8 = undefined;
