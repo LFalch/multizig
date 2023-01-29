@@ -36,7 +36,11 @@ pub fn main() !void {
         // Lie to `zigup` so it doesn't complain about its zig not being in the path
         var env_map = try std.process.getEnvMap(alloc);
         defer env_map.deinit();
-        try env_map.put("PATH", multizig);
+        if (env_map.get("PATH")) |p| {
+            try env_map.put("PATH", try std.mem.concat(alloc, u8, &[_][]const u8 { multizig ++ ":", p }));
+        } else {
+            try env_map.put("PATH", multizig);
+        }
 
         return std.process.execve(alloc, arg_list[0..arg_list_len], &env_map);
     }
