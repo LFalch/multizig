@@ -11,25 +11,24 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
-    var arg_list = [_][:0]const u8 {""} ** 512;
+    var arg_list = try std.BoundedArray([:0]const u8, 512).init(0);
 
     if (std.os.argv.len > 1 and mem.eql(u8, mem.span(std.os.argv[1]), "up")) {
         const bin = multizig ++ "/zigup";
         // Pass our custom directories as argments
-        arg_list[0] = bin;
-        arg_list[1] = "--install-dir";
-        arg_list[2] = zigup_install_dir;
-        arg_list[3] = "--path-link";
-        arg_list[4] = zig_link_path;
-        var arg_list_len: usize = 5;
+        try arg_list.append(bin);
+        try arg_list.append("--install-dir");
+        try arg_list.append(zigup_install_dir);
+        try arg_list.append("--path-link");
+        try arg_list.append(zig_link_path);
 
         {
             var args = std.process.args();
             defer args.deinit();
             _ = args.skip();
             _ = args.skip();
-            while (args.next()) |arg| : (arg_list_len+=1) {
-                arg_list[arg_list_len] = arg;
+            while (args.next()) |arg| {
+                try arg_list.append(arg);
             }
         }
 
@@ -42,19 +41,18 @@ pub fn main() !void {
             try env_map.put("PATH", multizig);
         }
 
-        return std.process.execve(alloc, arg_list[0..arg_list_len], &env_map);
+        return std.process.execve(alloc, arg_list.slice(), &env_map);
     }
 
     const bin = try getZigVersion();
     var args = std.process.args();
     defer args.deinit();
     _ = args.skip();
-    arg_list[0] = bin;
-    var arg_list_len: usize = 1;
-    while (args.next()) |arg| : (arg_list_len += 1) {
-        arg_list[arg_list_len] = arg;
+    try arg_list.append(bin);
+    while (args.next()) |arg| {
+        try arg_list.append(arg);
     }
-    return std.process.execv(alloc, arg_list[0..arg_list_len]);
+    return std.process.execv(alloc, arg_list.slice());
 }
 
 const home = "/home/falch";
