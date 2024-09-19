@@ -1,13 +1,12 @@
 const std = @import("std");
 const mem = std.mem;
-
-const GeneralPurposeAllocator = std.heap.GeneralPurposeAllocator;
+const heap = std.heap;
 
 // looks first for the zig version in env `ZIGV=`
 // then looks up the tree for `.zig-version`
 // lastly just uses the default from zigup
 pub fn main() !void {
-    var gpa = GeneralPurposeAllocator(.{}){};
+    var gpa = heap.ArenaAllocator.init(heap.page_allocator);
     defer _ = gpa.deinit();
     const alloc = gpa.allocator();
 
