@@ -36,7 +36,7 @@ pub fn main() !void {
         var env_map = try std.process.getEnvMap(alloc);
         defer env_map.deinit();
         if (env_map.get("PATH")) |p| {
-            try env_map.put("PATH", try std.mem.concat(alloc, u8, &[_][]const u8 { multizig ++ ":", p }));
+            try env_map.put("PATH", try std.mem.concat(alloc, u8, &[_][]const u8{ multizig ++ ":", p }));
         } else {
             try env_map.put("PATH", multizig);
         }
@@ -63,18 +63,18 @@ const zig_link_path = multizig ++ "/zig";
 var zig_version_buffer: [2048]u8 = undefined;
 
 fn getZigVersion() ![:0]const u8 {
-    if (std.os.getenv("ZIGV")) |zigv| {
+    if (std.posix.getenv("ZIGV")) |zigv| {
         var stream = std.io.fixedBufferStream(&zig_version_buffer);
         try std.fmt.format(stream.writer(), zigup_install_dir ++ "/{s}/files/zig\x00", .{zigv});
 
-        return @ptrCast([:0]const u8, stream.getWritten());
+        return @ptrCast(stream.getWritten());
     }
 
     var dir = try std.fs.cwd().openDir(".", .{});
     defer dir.close();
     while (!try isRoot(dir)) {
         var buffer: [2048]u8 = undefined;
-        var contents = dir.readFile(".zig-version", &buffer) catch |e| switch (e) {
+        const contents = dir.readFile(".zig-version", &buffer) catch |e| switch (e) {
             error.FileNotFound => {
                 var oldDir = dir;
                 defer oldDir.close();
@@ -89,7 +89,7 @@ fn getZigVersion() ![:0]const u8 {
         var stream = std.io.fixedBufferStream(&zig_version_buffer);
         try std.fmt.format(stream.writer(), zigup_install_dir ++ "/{s}/files/zig\x00", .{path});
 
-        return @ptrCast([:0]const u8, stream.getWritten());
+        return @ptrCast(stream.getWritten());
     }
     return zig_link_path;
 }
