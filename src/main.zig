@@ -1,25 +1,29 @@
 const std = @import("std");
+const paths = @import("paths");
 const mem = std.mem;
 const heap = std.heap;
+
+const is_debug = @import("builtin").mode == .Debug;
 
 // looks first for the zig version in env `ZIGV=`
 // then looks up the tree for `.zig-version`
 // lastly just uses the default from zigup
 pub fn main() !void {
-    var gpa = heap.ArenaAllocator.init(heap.page_allocator);
-    defer _ = gpa.deinit();
-    const alloc = gpa.allocator();
+    var dbga = if (is_debug) std.heap.DebugAllocator(.{}).init else {};
+    defer if (is_debug) {
+        _ = dbga.deinit();
+    };
+    const alloc = if (is_debug) dbga.allocator() else heap.smp_allocator;
 
-    var arg_list = try std.BoundedArray([:0]const u8, 512).init(0);
+    var arg_list = try std.BoundedArray([]const u8, 512).init(0);
 
     if (std.os.argv.len > 1 and mem.eql(u8, mem.span(std.os.argv[1]), "up")) {
-        const bin = multizig ++ "/zigup";
         // Pass our custom directories as argments
-        try arg_list.append(bin);
+        try arg_list.append(paths.zigup_bin);
         try arg_list.append("--install-dir");
-        try arg_list.append(zigup_install_dir);
+        try arg_list.append(paths.zigup_install_dir);
         try arg_list.append("--path-link");
-        try arg_list.append(zig_link_path);
+        try arg_list.append(paths.zig_link_path);
 
         {
             var args = std.process.args();
@@ -31,16 +35,10 @@ pub fn main() !void {
             }
         }
 
-        // Lie to `zigup` so it doesn't complain about its zig not being in the path
         var env_map = try std.process.getEnvMap(alloc);
         defer env_map.deinit();
-        if (env_map.get("PATH")) |p| {
-            try env_map.put("PATH", try std.mem.concat(alloc, u8, &[_][]const u8{ multizig ++ ":", p }));
-        } else {
-            try env_map.put("PATH", multizig);
-        }
 
-        return std.process.execve(alloc, arg_list.slice(), &env_map);
+        return std.process.execv(alloc, arg_list.slice());
     }
 
     const bin = try getZigVersion();
@@ -54,19 +52,14 @@ pub fn main() !void {
     return std.process.execv(alloc, arg_list.slice());
 }
 
-const home = "/home/falch";
-const zigup_install_dir = home ++ "/.zigup";
-const multizig = home ++ "/.multizig";
-const zig_link_path = multizig ++ "/zig";
-
 var zig_version_buffer: [2048]u8 = undefined;
 
-fn getZigVersion() ![:0]const u8 {
+fn getZigVersion() ![]const u8 {
     if (std.posix.getenv("ZIGV")) |zigv| {
         var stream = std.io.fixedBufferStream(&zig_version_buffer);
-        try std.fmt.format(stream.writer(), zigup_install_dir ++ "/{s}/files/zig\x00", .{zigv});
+        try std.fmt.format(stream.writer(), paths.zigup_install_dir ++ "/{s}/files/zig\x00", .{zigv});
 
-        return @ptrCast(stream.getWritten());
+        return stream.getWritten();
     }
 
     var dir = try std.fs.cwd().openDir(".", .{});
@@ -86,11 +79,11 @@ fn getZigVersion() ![:0]const u8 {
         const path = mem.trim(u8, contents, "\n\t \x00");
 
         var stream = std.io.fixedBufferStream(&zig_version_buffer);
-        try std.fmt.format(stream.writer(), zigup_install_dir ++ "/{s}/files/zig\x00", .{path});
+        try std.fmt.format(stream.writer(), paths.zigup_install_dir ++ "/{s}/files/zig\x00", .{path});
 
-        return @ptrCast(stream.getWritten());
+        return stream.getWritten();
     }
-    return zig_link_path;
+    return paths.zig_link_path;
 }
 
 fn isRoot(dir: std.fs.Dir) !bool {

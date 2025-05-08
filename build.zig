@@ -1,14 +1,20 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
-    // Standard target options allows the person running `zig build` to choose
-    // what target to build for. Here we do not override the defaults, which
-    // means any target is allowed, and the default is native. Other options
-    // for restricting supported target set are available.
-    const target = b.standardTargetOptions(.{});
+    const paths = b.addOptions();
+    {
+        const home = std.posix.getenv("HOME") orelse @panic("no home environment variable!");
+        const zigup_install_dir = b.option([]const u8, "zigup-install-dir", "Directory in which zigup installs its zigs") orelse b.pathJoin(&.{ home, "/.zigup" });
+        const multizig = b.option([]const u8, "multizig-dir", "The directory in which multizig stores its binaries and the zig link") orelse b.pathJoin(&.{ home, "/.multizig" });
+        const zig_bin = b.option([]const u8, "zig_bin", "The path to the zig link that get passed to zigup to manage") orelse b.pathJoin(&.{ multizig, "/zig" });
+        const zigup_bin = b.option([]const u8, "zigup_bin", "The path to the zigup binary") orelse b.pathJoin(&.{ multizig, "/zigup" });
 
-    // Standard release options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
+        paths.addOption([]const u8, "zigup_install_dir", zigup_install_dir);
+        paths.addOption([]const u8, "zig_link_path", zig_bin);
+        paths.addOption([]const u8, "zigup_bin", zigup_bin);
+    }
+    const target = b.standardTargetOptions(.{});
+    b.release_mode = .fast;
     const opt = b.standardOptimizeOption(.{});
 
     const exe = b.addExecutable(.{
@@ -16,8 +22,9 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = opt,
-        .use_llvm = opt != .Debug,
+        .use_llvm = if (opt == .Debug) false else null,
     });
+    exe.root_module.addOptions("paths", paths);
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
