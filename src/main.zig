@@ -9,7 +9,7 @@ const is_debug = @import("builtin").mode == .Debug;
 // then looks up the tree for `.zig-version`
 // lastly just uses the default from zigup
 pub fn main() !void {
-    var dbga = if (is_debug) std.heap.DebugAllocator(.{}).init else {};
+    var dbga = if (is_debug) heap.DebugAllocator(.{}).init else {};
     defer if (is_debug) {
         _ = dbga.deinit();
     };
@@ -35,19 +35,17 @@ pub fn main() !void {
             }
         }
 
-        var env_map = try std.process.getEnvMap(alloc);
-        defer env_map.deinit();
-
         return std.process.execv(alloc, arg_list.slice());
     }
 
     const bin = try getZigVersion();
-    var args = std.process.args();
-    defer args.deinit();
-    _ = args.skip();
-    try arg_list.append(bin);
-    while (args.next()) |arg| {
-        try arg_list.append(arg);
+    {
+        var args = std.process.args();
+        defer args.deinit();
+        _ = args.skip();
+        try arg_list.append(bin);
+        while (args.next()) |arg|
+            try arg_list.append(arg);
     }
     return std.process.execv(alloc, arg_list.slice());
 }

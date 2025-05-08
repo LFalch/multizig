@@ -14,7 +14,6 @@ pub fn build(b: *std.Build) void {
         paths.addOption([]const u8, "zigup_bin", zigup_bin);
     }
     const target = b.standardTargetOptions(.{});
-    b.release_mode = .fast;
     const opt = b.standardOptimizeOption(.{});
 
     const exe = b.addExecutable(.{
