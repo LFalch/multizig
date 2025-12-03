@@ -18,9 +18,11 @@ pub fn build(b: *std.Build) void {
 
     const exe = b.addExecutable(.{
         .name = "zig",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = opt,
+        .root_module = b.createModule(.{ // this line was added
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = opt,
+        }),
         .use_llvm = if (opt == .Debug) false else null,
     });
     exe.root_module.addOptions("paths", paths);
